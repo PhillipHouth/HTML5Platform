@@ -33,3 +33,4 @@ Keyboard.prototype.onKeyUp = function (evt) {
 Keyboard.prototype.isKeyDown = function (keyCode) {
     return this.keys[keyCode];
 };
+

@@ -41,14 +41,17 @@ var fpsTime = 0;
 
 // load an image to draw
 
+var STATE_SPLASH = 0;
+var STATE_GAME = 1;
+var STATE_GAMEOVER = 2;
 
-var chuckNorris = document.createElement("img");
-chuckNorris.src = "hero.png";
+var gameState = STATE_SPLASH;
 
+var score = 0;
+var lives = 3;
+var heartImage = document.createElement("img");
+heartImage.src = "heartImage.png";
 
-
-
-var LAYER_COUNT = 3;
 var MAP = { tw: 60, th: 15 };
 var TILE = 35;
 var TILESET_TILE = TILE * 2;
@@ -60,6 +63,7 @@ var LAYER_COUNT = 3;
 var LAYER_BACKGOUND = 0;
 var LAYER_PLATFORMS = 1;
 var LAYER_LADDERS = 2;
+
 
 var player = new Player();
 var keyboard = new Keyboard();
@@ -83,6 +87,10 @@ var tileset = document.createElement("img");
 tileset.src = "tileset.png";
 
 var cells = []; // the array that holds our simplified collision data
+
+var musicBackground;
+var sfxFire;
+
 function initialize() {
     for (var layerIdx = 0; layerIdx < LAYER_COUNT; layerIdx++) { // initialize the collision map
         cells[layerIdx] = [];
@@ -107,6 +115,24 @@ function initialize() {
             }
         }
     }
+    musicBackground = new Howl(
+        {
+            urls: ["background.ogg"],
+            loop: true,
+            buffer: true,
+            volume: 0.5
+        });
+    musicBackground.play();
+    sfxFire = new Howl(
+        {
+            urls: ["fireEffect.ogg"],
+            buffer: true,
+            volume: 1,
+            onend: function () {
+                isSfxPlaying = false;
+            }
+        });
+
 }
 
 function cellAtPixelCoord(layer, x, y) {
@@ -142,18 +168,41 @@ function bound(value, min, max) {
     return value;
 }
 
+
+var worldOffsetX = 0;
 function drawMap() {
+    var startX = -1;
+    var maxTiles = Math.floor(SCREEN_WIDTH / TILE) + 2;
+    var tileX = pixelToTile(player.position.x);
+    var offsetX = TILE + Math.floor(player.position.x % TILE);
+
+    startX = tileX - Math.floor(maxTiles / 2);
+
+    if (startX < -1) {
+        startX = 0;
+        offsetX = 0;
+    }
+    if (startX > MAP.tw - maxTiles) {
+        startX = MAP.tw - maxTiles + 1;
+        offsetX = TILE;
+    }
+
+    worldOffsetX = startX * TILE + offsetX;
+
     for (var layerIdx = 0; layerIdx < LAYER_COUNT; layerIdx++) {
-        var idx = 0;
         for (var y = 0; y < level1.layers[layerIdx].height; y++) {
-            for (var x = 0; x < level1.layers[layerIdx].width; x++) {
+            var idx = y * level1.layers[layerIdx].width + startX;
+            for (var x = startX; x < startX + maxTiles; x++) {
                 if (level1.layers[layerIdx].data[idx] != 0) {
-                    // the tiles in the Tiled map are base 1 (meaning a value of 0 means no tile), so subtract one from the tileset id to get the
-                    // correct tile
+                    // the tiles in the Tiled map are base 1 (meaning a value of 0 means no tile),
+                    // so subtract one from the tileset id to get the correct tile
                     var tileIndex = level1.layers[layerIdx].data[idx] - 1;
-                    var sx = TILESET_PADDING + (tileIndex % TILESET_COUNT_X) * (TILESET_TILE + TILESET_SPACING);
-                    var sy = TILESET_PADDING + (Math.floor(tileIndex / TILESET_COUNT_X)) * (TILESET_TILE + TILESET_SPACING);
-                    context.drawImage(tileset, sx, sy, TILESET_TILE, TILESET_TILE, x * TILE, (y - 1) * TILE, TILESET_TILE, TILESET_TILE);
+                    var sx = TILESET_PADDING + (tileIndex % TILESET_COUNT_X) *
+                        (TILESET_TILE + TILESET_SPACING);
+                    var sy = TILESET_PADDING + (Math.floor(tileIndex / TILESET_COUNT_Y)) *
+                        (TILESET_TILE + TILESET_SPACING);
+                    context.drawImage(tileset, sx, sy, TILESET_TILE, TILESET_TILE,
+                        (x - startX) * TILE - offsetX, (y - 1) * TILE, TILESET_TILE, TILESET_TILE);
                 }
                 idx++;
             }
@@ -171,9 +220,51 @@ function run() {
 
     var deltaTime = getDeltaTime();
 
+    switch (gameState) {
+        case STATE_SPLASH: runSplash(deltaTime);
+            break;
+        case STATE_GAME: runGame(deltaTime);
+            break;
+        case STATE_GAMEOVER: runGameOver(deltaTime);
+            break;
+    }
+}
+
+var splashTimer = 120
+function runSplash(deltaTime) {
     drawMap();
+    context.fillStyle = "#000";
+    context.font = "40px Arial";
+    context.fillText("Project: Platform", 150, 200);
+
+    if (gameState == STATE_SPLASH & splashTimer == 0) {
+        gameState = STATE_GAME;
+        return;
+    }
+    else splashTimer = splashTimer - 1
+}
+
+
+function runGame(deltaTime) {
     player.update(deltaTime);
+
+    drawMap();
     player.draw();
+
+    // life counter
+    for (var i = 0; i < lives; i++) {
+        context.fillStyle = "yellow";
+        context.font = "32px Arial";
+        var lifeCounter = "x " + lives;
+        context.fillText(lifeCounter, 70, 60);
+        context.drawImage(heartImage, 10, 20);
+    }
+    // score
+    context.fillStyle = "yellow";
+    context.font = "32px Arial";
+    var scoreText = "Score: " + score;
+    context.fillText(scoreText, SCREEN_WIDTH - 170, 50);
+
 
     // update the frame counter
     fpsTime += deltaTime;
@@ -188,6 +279,13 @@ function run() {
     context.fillStyle = "#f00";
     context.font = "14px Arial";
     context.fillText("FPS: " + fps, 5, 20, 100);
+}
+
+function runGameOver(deltaTime) {
+    drawMap();
+    context.fillStyle = "#000";
+    context.font = "40px Arial";
+    context.fillText("GAME OVER", 150, 200);
 }
 
 initialize();
