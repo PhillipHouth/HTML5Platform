@@ -44,15 +44,16 @@ var fpsTime = 0;
 var STATE_SPLASH = 0;
 var STATE_GAME = 1;
 var STATE_GAMEOVER = 2;
+var STATE_WIN = 3;
 
 var gameState = STATE_SPLASH;
 
-var score = 0;
+var score = 10000;
 var lives = 3;
 var heartImage = document.createElement("img");
 heartImage.src = "heartImage.png";
 
-var MAP = { tw: 60, th: 15 };
+var MAP = { tw: 100, th: 15 };
 var TILE = 35;
 var TILESET_TILE = TILE * 2;
 var TILESET_PADDING = 2;
@@ -62,7 +63,8 @@ var TILESET_COUNT_Y = 14;
 var LAYER_COUNT = 3;
 var LAYER_BACKGOUND = 0;
 var LAYER_PLATFORMS = 1;
-var LAYER_LADDERS = 2;
+var LAYER_FOREGROUND = 2;
+
 
 
 var player = new Player();
@@ -91,6 +93,8 @@ var cells = []; // the array that holds our simplified collision data
 var musicBackground;
 var sfxFire;
 
+
+
 function initialize() {
     for (var layerIdx = 0; layerIdx < LAYER_COUNT; layerIdx++) { // initialize the collision map
         cells[layerIdx] = [];
@@ -117,26 +121,71 @@ function initialize() {
     }
     musicBackground = new Howl(
         {
-            urls: ["background.ogg"],
+            urls: ["background.mp3"],
             loop: true,
             buffer: true,
-            volume: 0.5
+            volume: 0.3
         });
     musicBackground.play();
-    sfxFire = new Howl(
+
+    sfxJump = new Howl(
         {
-            urls: ["fireEffect.ogg"],
+            urls: ["jump.wav"],
             buffer: true,
-            volume: 1,
+            volume: 0.2,
             onend: function () {
                 isSfxPlaying = false;
             }
         });
-
+    sfxDeath = new Howl(
+        {
+            urls: ["death.wav"],
+            buffer: true,
+            volume: 0.2,
+            onend: function () {
+                isSfxPlaying = false;
+            }
+        });
+    sfxLastLife = new Howl(
+        {
+            urls: ["lastlife.wav"],
+            buffer: true,
+            volume: 0.2,
+            onend: function () {
+                isSfxPlaying = false;
+            }
+        });
+    sfxWin = new Howl(
+        {
+            urls: ["win.wav"],
+            buffer: true,
+            volume: 0.2,
+            onend: function () {
+                isSfxPlaying = false;
+            }
+        });
+    sfxLoseLife = new Howl(
+        {
+            urls: ["loselife.wav"],
+            buffer: true,
+            volume: 0.2,
+            onend: function () {
+                isSfxPlaying = false;
+            }
+        });
+    sfxTimeOut = new Howl(
+        {
+            urls: ["timeout.wav"],
+            buffer: true,
+            volume: 0.2,
+            onend: function () {
+                isSfxPlaying = false;
+            }
+        });
 }
 
 function cellAtPixelCoord(layer, x, y) {
-    if (x < 0 || x > SCREEN_WIDTH) // remove ‘|| y<0’
+    if (x < 0 || x > SCREEN_WIDTH || y < 0) // remove ‘|| y<0’
         return 1;
     // let the player drop of the bottom of the screen
     // (this means death)
@@ -146,7 +195,7 @@ function cellAtPixelCoord(layer, x, y) {
 };
 function cellAtTileCoord(layer, tx, ty) // remove ‘|| y<0’
 {
-    if (tx < 0 || tx >= MAP.tw)
+    if (tx < 0 || tx >= MAP.tw || ty < 0)
         return 1;
     // let the player drop of the bottom of the screen
     // (this means death)
@@ -211,9 +260,6 @@ function drawMap() {
 }
 
 
-
-
-
 function run() {
     context.fillStyle = "#ccc";
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -227,8 +273,12 @@ function run() {
             break;
         case STATE_GAMEOVER: runGameOver(deltaTime);
             break;
+        case STATE_WIN: runWin(deltaTime);
+            break;
     }
 }
+
+
 
 var splashTimer = 120
 function runSplash(deltaTime) {
@@ -238,8 +288,13 @@ function runSplash(deltaTime) {
     context.fillText("Project: Platform", 150, 200);
 
     if (gameState == STATE_SPLASH & splashTimer == 0) {
-        gameState = STATE_GAME;
-        return;
+        context.fillStyle = "#000";
+        context.font = "20px Arial";
+        context.fillText("Press S or Down to Start", 150, 400);
+        if (keyboard.isKeyDown(keyboard.KEY_S) == true || keyboard.isKeyDown(keyboard.KEY_DOWN) == true) {
+            gameState = STATE_GAME;
+            return;
+        }
     }
     else splashTimer = splashTimer - 1
 }
@@ -255,16 +310,10 @@ function runGame(deltaTime) {
     for (var i = 0; i < lives; i++) {
         context.fillStyle = "yellow";
         context.font = "32px Arial";
-        var lifeCounter = "x " + lives;
+        var lifeCounter = "x " + (lives - 1);
         context.fillText(lifeCounter, 70, 60);
         context.drawImage(heartImage, 10, 20);
     }
-    // score
-    context.fillStyle = "yellow";
-    context.font = "32px Arial";
-    var scoreText = "Score: " + score;
-    context.fillText(scoreText, SCREEN_WIDTH - 170, 50);
-
 
     // update the frame counter
     fpsTime += deltaTime;
@@ -279,13 +328,48 @@ function runGame(deltaTime) {
     context.fillStyle = "#f00";
     context.font = "14px Arial";
     context.fillText("FPS: " + fps, 5, 20, 100);
+
+    score -= 10;
+    if (score <= 0) {
+        lives--;
+        score = 5000;
+    }
+    // score
+    context.fillStyle = "yellow";
+    context.font = "32px Arial";
+    var scoreText = "Score: " + score;
+    context.fillText(scoreText, SCREEN_WIDTH - 200, 50);
 }
+
+
 
 function runGameOver(deltaTime) {
     drawMap();
     context.fillStyle = "#000";
     context.font = "40px Arial";
     context.fillText("GAME OVER", 150, 200);
+}
+
+function runWin(deltaTime) {
+    drawMap();
+    player.draw();
+    context.fillStyle = "#000";
+    context.font = "40px Arial";
+    context.fillText("Level Complete", 150, 200);
+    context.fillStyle = "yellow";
+    context.font = "32px Arial";
+    var scoreText = "Score: " + score;
+    context.fillText(scoreText, 150, 270);
+    context.fillStyle = "yellow";
+    context.font = "32px Arial";
+    var lifeCounter = "x " + (lives - 1) + " = " + ((lives - 1) * 10000);
+    context.fillText(lifeCounter, 220, 330);
+    context.drawImage(heartImage, 150, 280);
+    context.fillStyle = "yellow";
+    context.font = "32px Arial";
+    var scoreText = "Total: " + (score + ((lives - 1) * 10000));
+    context.fillText(scoreText, 150, 400);
+
 }
 
 initialize();
