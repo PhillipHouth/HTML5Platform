@@ -232,8 +232,8 @@ Player.prototype.update = function (deltaTime) {
 	if (this.position.y > canvas.height) {
 		lives = lives - 1;
 		if (lives > 0)
-			sfxDeath.play();
-		else sfxLastLife.play();
+			sfxDeathFall.play();
+		else sfxGameOverFall.play();
 		this.position.set(1 * TILE, 10 * TILE);
 	}
 	if (score == 10) {

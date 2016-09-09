@@ -137,7 +137,7 @@ function initialize() {
                 isSfxPlaying = false;
             }
         });
-    sfxDeath = new Howl(
+    sfxDeathFall = new Howl(
         {
             urls: ["death.wav"],
             buffer: true,
@@ -146,7 +146,7 @@ function initialize() {
                 isSfxPlaying = false;
             }
         });
-    sfxLastLife = new Howl(
+    sfxGameOverFall = new Howl(
         {
             urls: ["lastlife.wav"],
             buffer: true,
